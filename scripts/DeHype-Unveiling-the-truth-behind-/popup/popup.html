@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeHype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <div class="brand">
+        <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 2C14.5013 4.73835 15.9228 8.29203 16 12C15.9228 15.708 14.5013 19.2616 12 22C9.49872 19.2616 8.07725 15.708 8 12C8.07725 8.29203 9.49872 4.73835 12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h1>DeHype</h1>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </header>
+
+    <div class="status-card" id="status-card">
+        <div class="pulse-dot"></div>
+        <div class="status-content">
+            <span class="label">Detection System</span>
+            <span id="status" class="value">Active</span>
+        </div>
+    </div>
+    
+    <main>
+      <div class="input-group">
+        <label for="apiKey">
+            <span>Gemini API Key</span>
+            <span class="info-icon" title="Required for AI analysis">?</span>
+        </label>
+        <div class="input-wrapper">
+            <input type="password" id="apiKey" placeholder="Pk_...">
+            <div class="glow-effect"></div>
+        </div>
+      </div>
+      
+      <button id="saveBtn" class="primary-btn">
+        <span>Save Configuration</span>
+      </button>
+      <div id="msg" class="message"></div>
+    </main>
+
+    <footer>
+      <p>Unveiling the truth behind the hype.</p>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

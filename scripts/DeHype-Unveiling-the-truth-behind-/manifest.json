@@ -1,0 +1,43 @@
+{
+    "manifest_version": 3,
+    "name": "DeHype - Clickbait Remover",
+    "version": "1.0",
+    "description": "Replaces clickbait titles with factual AI summaries",
+    "permissions": [
+        "activeTab",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "*://*.youtube.com/*",
+        "https://generativelanguage.googleapis.com/*"
+    ],
+    "action": {
+        "default_popup": "popup/popup.html",
+        "default_title": "DeHype Settings"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.youtube.com/*"
+            ],
+            "js": [
+                "scripts/content.js"
+            ],
+            "run_at": "document_end"
+        }
+    ],
+    "background": {
+        "service_worker": "scripts/background.js"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "scripts/injected.js"
+            ],
+            "matches": [
+                "*://*.youtube.com/*"
+            ]
+        }
+    ]
+}

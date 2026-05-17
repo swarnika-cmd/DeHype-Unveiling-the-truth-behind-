@@ -1,184 +1,182 @@
-# DeHype Pro — AI Content Intelligence Engine 🚫✨🧠
+# DeHype Pro — AI Content Intelligence Engine 🧠✨
 
-> **Unveil the truth behind the hype. Everywhere.**
+> *unveiling the truth behind the hype*
 
-DeHype Pro is a **Chrome Extension** that uses AI to fight misinformation, clickbait, and manipulation across the entire web. Originally built to de-clickbait YouTube titles, it has evolved into a **full-spectrum AI content intelligence engine** — analyzing any webpage for credibility, sentiment, bias, and more.
-
----
-
-## 🚀 Features
-
-### 🎯 YouTube DeHype (Core)
-- **Clickbait Detection**: Identifies sensationalist titles on YouTube videos
-- **AI-Powered Summaries**: Uses Gemini to read transcripts and generate factual 1-sentence summaries
-- **Title Replacement**: Swaps hype-filled titles with real, accurate answers
-- **Bulk Title Scanner**: Scan all visible YouTube titles in your feed at once
-
-### 📊 Smart Content Analysis (NEW — inspired by [SmartContent](https://github.com/prabhsharan1/smart-content))
-- **Universal Page Analysis**: Analyze ANY webpage with a single click
-- **AI Summaries**: Get concise, factual summaries of any content
-- **Intelligent Tagging**: Auto-generate relevant topic tags
-- **Smart Suggestions**: Receive AI-powered insights and recommendations
-- **Floating Analysis Panel**: Beautiful slide-out panel on every webpage
-
-### 🛡️ Credibility Scoring (NEW)
-- **Trust Score (0-100)**: AI-powered credibility assessment of any article
-- **Animated Score Ring**: Visual credibility indicator with gradient animation
-- **Bias Detection**: Identifies emotional language, unsourced claims, and manipulation
-
-### 💬 Sentiment Analysis (NEW)
-- **Emotional Tone Detection**: Analyze whether content is positive, negative, or neutral
-- **Manipulation Alerts**: Detect emotional manipulation tactics, false urgency, and sensationalism
-- **Visual Sentiment Bar**: Color-coded sentiment indicator with animated marker
-
-### ⚡ Advanced Features
-- **Context Menu Integration**: Right-click any text → "DeHype: Analyze Selected Text"
-- **Right-Click Page Analysis**: Analyze any page from the context menu
-- **Auto-Analyze Mode**: Automatically analyze pages as you browse
-- **Analysis History**: Track all your past analyses with timestamps
-- **Usage Statistics**: See total pages analyzed, clickbait caught, and time saved
-- **Clipboard Export**: Copy analysis results with one click
-- **Privacy Focused**: All processing via your personal API key, stored locally
+DeHype Pro is a **Chrome Extension** that uses AI to fight misinformation, clickbait, and emotional manipulation across the entire web. It analyzes any webpage or YouTube video in real-time — delivering factual summaries, credibility scores, sentiment analysis, smart tags, and actionable insights, all powered by **Groq's blazing-fast LLM inference**.
 
 ---
 
-## 🛠️ Installation
+## ✨ Key Features
 
-1. **Clone the Repository**:
+### 🎯 YouTube DeHype
+- **Clickbait Detection** — Identifies sensationalist, misleading titles on YouTube
+- **AI Title Replacement** — Reads the transcript and replaces hype with a factual one-liner
+- **Clickbait Scoring** — Quantified 0-100 clickbait meter with specific tactic identification
+- **Bulk Title Scanner** — Scan all visible titles in your YouTube feed at once
+
+### 📊 Universal Page Analysis
+- **Works on Any Website** — News articles, blogs, social media, research papers
+- **AI Summaries** — Concise, factual 3-4 sentence summaries of any content
+- **Smart Tagging** — Auto-generates relevant topic tags for content categorization
+- **AI Suggestions** — 3 actionable insights per analysis
+
+### 🛡️ Credibility Scoring
+- **Trust Score (0-100)** — AI-powered credibility assessment with animated ring visualization
+- **Bias Detection** — Identifies emotional language, unsourced claims, and logical fallacies
+- **Source Quality** — Evaluates factual grounding and citation patterns
+
+### 💬 Sentiment & Manipulation Detection
+- **Emotional Tone Analysis** — Detects positive, negative, or neutral sentiment
+- **Manipulation Alerts** — Flags false urgency, fear-mongering, and emotional exploitation
+- **Visual Sentiment Bar** — Color-coded indicator with animated marker
+
+### ⚡ Power Features
+- **Context Menu Integration** — Right-click any selected text, page, or link to analyze instantly
+- **Auto-Analyze Mode** — Automatically analyze pages as you browse
+- **Analysis History** — Persistent history with timestamps, scores, and domains
+- **Usage Statistics** — Track pages analyzed, clickbait caught, and time saved
+- **Clipboard Export** — Copy formatted analysis results with one click
+- **5 Independent Toggles** — Enable/disable each feature individually
+- **Privacy First** — All data stored locally, your API key never leaves your browser
+
+---
+
+## 🛠️ Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Platform | Chrome Extension (Manifest V3) |
+| AI Backend | Groq API — Llama 3.3 70B Versatile |
+| Architecture | Service Worker + Content Scripts + Injected Scripts |
+| Concurrency | Parallel `Promise.all()` — 6 simultaneous API calls per analysis |
+| YouTube Integration | DOM scraping + `ytInitialPlayerResponse` transcript extraction |
+| UI Framework | Vanilla JS/CSS — zero dependencies |
+| Storage | Chrome Storage API (local) |
+| Design | Shader gradient aesthetic with noise textures |
+
+---
+
+## 📁 Project Structure
+
+```
+DeHype-Pro/
+├── manifest.json                # Manifest V3 configuration
+├── popup/
+│   ├── popup.html               # Tabbed popup UI (Settings / Analyze / History)
+│   ├── popup.css                # Shader gradient design system
+│   └── popup.js                 # Analysis engine + rendering
+├── scripts/
+│   ├── background.js            # Service worker — CORS proxy, context menus, auto-analyze
+│   ├── content.js               # YouTube-specific analysis & title replacement
+│   ├── page-analyzer.js         # Universal page analyzer (runs on all sites)
+│   ├── analyzer-panel.css       # Floating panel styles
+│   └── injected.js              # YouTube page-world script injection
+└── README.md
+```
+
+---
+
+## 🚀 Installation
+
+1. **Clone the repository**
    ```bash
    git clone https://github.com/swarnika-cmd/DeHype-Unveiling-the-truth-behind-.git
    ```
 
-2. **Open Chrome Extensions**:
-   - Go to `chrome://extensions/` in your browser
-   - Enable **Developer mode** (top right toggle)
+2. **Load in Chrome**
+   - Navigate to `chrome://extensions/`
+   - Enable **Developer mode** (top right)
+   - Click **"Load unpacked"** → select the project folder
 
-3. **Load Unpacked**:
-   - Click **"Load unpacked"**
-   - Select the project folder
-
-4. **Setup API Key**:
-   - Click the DeHype Pro icon in your toolbar
-   - Enter your **Gemini API Key** (Get one free from [Google AI Studio](https://aistudio.google.com/))
-   - Click **"Save Key"**
+3. **Configure API Key**
+   - Click the DeHype Pro icon in the toolbar
+   - Go to **Settings** tab
+   - Paste your **Groq API Key** (free from [console.groq.com/keys](https://console.groq.com/keys))
+   - Click **Save Key**
 
 ---
 
-## 📖 How to Use
+## 📖 Usage
 
-### YouTube Mode
-1. Go to any YouTube video
-2. The floating DeHype panel appears in the bottom right
+### YouTube
+1. Navigate to any YouTube video
+2. The DeHype floating panel appears (bottom right)
 3. Click **"🎯 Analyze This Video"** to de-clickbait the title
-4. Click **"📊 Scan All Titles"** to scan your feed
-5. View clickbait score, sentiment analysis, and topic tags
+4. View clickbait score, sentiment, and topic tags in the results panel
+5. Click **"📊 Scan All Titles"** to scan your entire feed
 
-### Universal Analysis Mode
-1. Visit any webpage (news, blogs, articles, etc.)
-2. Click the **floating DeHype button** (bottom right)
-3. Click **"🔍 Analyze Page"** in the panel
-4. Get instant AI-powered summary, credibility score, sentiment, tags, and insights
+### Any Webpage
+1. Visit any news article, blog, or webpage
+2. Click the floating **DeHype button** (bottom right corner)
+3. Click **"🔍 Analyze Page"**
+4. Get instant summary, credibility score, sentiment, tags, and insights
 
-### Quick Analysis (Popup)
+### Extension Popup
 1. Click the DeHype Pro extension icon
-2. Switch to the **"Analyze"** tab
-3. Click **"Analyze Current Page"** or paste custom text
-4. View comprehensive results with animated visualizations
+2. **Analyze tab** → "Analyze Current Page" or paste custom text
+3. **History tab** → View past analyses with scores
+4. **Settings tab** → Configure features and API key
 
-### Right-Click Analysis
-- Select any text → Right-click → **"🔍 DeHype: Analyze Selected Text"**
+### Right-Click Menu
+- Select text → Right-click → **"🔍 DeHype: Analyze Selected Text"**
 - Right-click any page → **"📊 DeHype: Analyze This Page"**
-- Right-click any link → **"🔗 DeHype: Check Link Credibility"**
+- Right-click a link → **"🔗 DeHype: Check Link Credibility"**
 
 ---
 
-## 🔧 Technical Details
+## ⚙️ Analysis Pipeline
 
-| Feature | Technology |
-|---------|-----------|
-| Extension Standard | Chrome Manifest V3 |
-| AI Model | Google Gemini 2.0 Flash via REST API |
-| Architecture | Service Worker + Content Scripts |
-| Content Analysis | Parallel Promise.all() API calls |
-| YouTube Integration | DOM scraping + `ytInitialPlayerResponse` |
-| UI Framework | Vanilla JS + CSS with animations |
-| Storage | Chrome Storage API (local) |
-| Analysis Types | 6 parallel AI queries per analysis |
+Each analysis triggers **6 parallel AI calls** for maximum speed:
 
-### Architecture
 ```
-DeHype Pro v2.0
-├── manifest.json              # Manifest V3 configuration
-├── popup/
-│   ├── popup.html             # Premium tabbed popup UI
-│   ├── popup.css              # Dark-mode design system
-│   └── popup.js               # Popup controller + analysis engine
-├── scripts/
-│   ├── background.js          # Service worker (CORS proxy, context menus, auto-analyze)
-│   ├── content.js             # YouTube-specific analysis (DeHype core)
-│   ├── page-analyzer.js       # Universal page analysis (SmartContent integration)
-│   ├── analyzer-panel.css     # Floating panel styles
-│   └── injected.js            # YouTube page world injection
-└── README.md
+User clicks "Analyze"
+        │
+        ▼
+   ┌─────────────────────────────────────────┐
+   │          Promise.all() — Parallel       │
+   ├─────────┬──────────┬──────────┬─────────┤
+   │ Summary │   Tags   │ Insights │  Cred.  │
+   │         │          │          │  Score  │
+   ├─────────┼──────────┼──────────┼─────────┤
+   │       Sentiment    │    Clickbait       │
+   │       Analysis     │    Detection       │
+   └─────────┴──────────┴──────────┴─────────┘
+        │
+        ▼
+   Rendered in UI with animations
 ```
 
-### Analysis Pipeline
-Each analysis runs **6 parallel Gemini API calls** for maximum speed:
-1. **Summary Generation** — Factual content summary
-2. **Tag Extraction** — Auto-generated topic tags
-3. **Insight Suggestions** — AI-powered actionable insights
-4. **Credibility Scoring** — Trust assessment (0-100)
-5. **Sentiment Analysis** — Emotional tone detection
-6. **Clickbait Detection** — Manipulation tactic identification
+All requests go through the **background service worker** as a CORS proxy, keeping API keys secure and bypassing content security policies.
 
 ---
 
 ## 🎨 Design
 
-- **Dark Mode UI** with glassmorphism effects
-- **Gradient accents** (purple → cyan)
-- **Animated score rings** and sentiment bars
-- **Smooth micro-animations** throughout
-- **Premium typography** with Inter font
-- **Responsive floating panels** on all pages
+Built with a **shader gradient aesthetic** inspired by modern generative art:
+
+- Pure black (`#050508`) canvas with organic flowing cyan noise gradients
+- Film grain SVG texture overlay for depth
+- **Playfair Display** serif for headings — elegant and editorial
+- **Inter** sans-serif for body — clean and readable
+- Animated score rings, sentiment bars, and pulse indicators
+- Frosted glass card effects with `backdrop-filter: blur`
+- Micro-animations on every interactive element
 
 ---
 
-## 📊 Feature Comparison
+## 🔒 Privacy & Security
 
-| Feature | DeHype v1.0 | DeHype Pro v2.0 |
-|---------|-------------|-----------------|
-| YouTube clickbait detection | ✅ | ✅ Enhanced |
-| Title replacement | ✅ | ✅ Enhanced |
-| Works on all websites | ❌ | ✅ |
-| Content summarization | ❌ | ✅ |
-| Smart tagging | ❌ | ✅ |
-| AI suggestions | ❌ | ✅ |
-| Credibility scoring | ❌ | ✅ |
-| Sentiment analysis | ❌ | ✅ |
-| Clickbait meter | ❌ | ✅ |
-| Context menu integration | ❌ | ✅ |
-| Auto-analyze mode | ❌ | ✅ |
-| Analysis history | ❌ | ✅ |
-| Usage statistics | ❌ | ✅ |
-| Bulk title scanning | ❌ | ✅ |
-| Premium dark UI | ❌ | ✅ |
-| Feature toggles | ❌ | ✅ |
+- **No external servers** — All processing via your personal Groq API key
+- **Local storage only** — API key, history, and settings stored in Chrome Storage
+- **No tracking** — Zero telemetry, analytics, or data collection
+- **Open source** — Full codebase visible and auditable
 
 ---
 
-## 🙏 Acknowledgments
+## 📄 License
 
-- **SmartContent** by [@prabhsharan1](https://github.com/prabhsharan1/smart-content) — Content analysis architecture inspiration
-- **Google Gemini API** — AI backbone
-- **Chrome Extensions Manifest V3** — Platform
+MIT License — free to use, modify, and distribute.
 
 ---
 
-## 🔒 Privacy
-
-DeHype Pro processes content through Google's Gemini API using **your personal API key**. No data is stored on external servers. Your API key and analysis history are stored locally in Chrome Storage.
-
----
-
-*Built with ❤️ by [Swarnika-cmd](https://github.com/swarnika-cmd)*
+*Built with ❤️ by [Swarnika](https://github.com/swarnika-cmd)*

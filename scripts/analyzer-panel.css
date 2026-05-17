@@ -1,0 +1,362 @@
+/* ═══════════════════════════════════════════════════════════
+   DeHype Pro v2.0 — Universal Page Analyzer Panel Styles
+   Injected on all pages via content_scripts
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Floating Action Button ── */
+#dehype-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2147483646;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#dehype-fab-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(168, 85, 247, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#dehype-fab-btn:hover {
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 25px rgba(168, 85, 247, 0.25);
+    border-color: rgba(168, 85, 247, 0.7);
+}
+
+#dehype-fab-btn:active {
+    transform: scale(0.95);
+}
+
+/* ── Analysis Panel ── */
+#dehype-analysis-panel {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 360px;
+    max-height: 480px;
+    background: linear-gradient(180deg, #12121a, #0a0a0f);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(168, 85, 247, 0.1);
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    z-index: 2147483647;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    animation: dehypeSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#dehype-analysis-panel.visible {
+    display: flex;
+}
+
+@keyframes dehypeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dehypeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ── Panel Header ── */
+.dehype-ap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+    background: linear-gradient(180deg, rgba(168, 85, 247, 0.08), transparent);
+}
+
+.dehype-ap-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dehype-ap-brand {
+    font-size: 14px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #a855f7, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dehype-ap-badge {
+    font-size: 8px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #a855f7, #06b6d4);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+#dehype-ap-close {
+    background: none;
+    border: none;
+    color: #555570;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+#dehype-ap-close:hover {
+    color: #e8e8f0;
+}
+
+/* ── Panel Content ── */
+#dehype-ap-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    font-size: 12px;
+    color: #e8e8f0;
+    line-height: 1.6;
+}
+
+#dehype-ap-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+#dehype-ap-content::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.3);
+    border-radius: 4px;
+}
+
+/* ── Sections ── */
+.dehype-ap-section {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(42, 42, 62, 0.5);
+}
+
+.dehype-ap-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.dehype-ap-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #a855f7;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.dehype-ap-text {
+    font-size: 12px;
+    color: #d4d4e0;
+    line-height: 1.7;
+}
+
+.dehype-ap-sub {
+    font-size: 11px;
+    color: #8888a0;
+    margin-top: 4px;
+    line-height: 1.5;
+}
+
+/* ── Credibility Bar ── */
+.dehype-ap-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 4px 0;
+}
+
+.dehype-ap-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Sentiment ── */
+.dehype-ap-sentiment-bar {
+    position: relative;
+    height: 20px;
+    margin: 6px 0;
+}
+
+.dehype-ap-sentiment-track {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
+    border-radius: 2px;
+}
+
+.dehype-ap-sentiment-dot {
+    position: absolute;
+    top: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border: 2px solid #a855f7;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+    transition: left 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Tags ── */
+.dehype-ap-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.dehype-ap-tag {
+    display: inline-block;
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.dehype-ap-tag:hover {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: #a855f7;
+}
+
+/* ── Suggestions ── */
+.dehype-ap-suggestions {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dehype-ap-suggestions li {
+    font-size: 11px;
+    color: #d4d4e0;
+    padding: 6px 10px;
+    background: rgba(236, 72, 153, 0.05);
+    border-left: 2px solid #ec4899;
+    border-radius: 0 6px 6px 0;
+    line-height: 1.5;
+}
+
+/* ── Loading ── */
+.dehype-ap-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 30px 0;
+}
+
+.dehype-ap-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(42, 42, 62, 0.8);
+    border-top-color: #a855f7;
+    border-radius: 50%;
+    animation: dehypeSpin 0.8s linear infinite;
+}
+
+@keyframes dehypeSpin {
+    to { transform: rotate(360deg); }
+}
+
+.dehype-ap-loading p {
+    font-size: 11px;
+    color: #8888a0;
+}
+
+/* ── Error & Empty ── */
+.dehype-ap-error {
+    padding: 16px;
+    text-align: center;
+    color: #ef4444;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.dehype-ap-empty {
+    padding: 24px 0;
+    text-align: center;
+}
+
+.dehype-ap-empty p {
+    font-size: 12px;
+    color: #8888a0;
+}
+
+/* ── Actions Bar ── */
+.dehype-ap-actions {
+    display: flex;
+    gap: 6px;
+    padding: 10px 16px;
+    border-top: 1px solid rgba(42, 42, 62, 0.5);
+    background: rgba(10, 10, 15, 0.5);
+}
+
+.dehype-ap-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.dehype-ap-btn.primary {
+    background: linear-gradient(135deg, #a855f7, #06b6d4);
+    color: white;
+}
+
+.dehype-ap-btn.primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.dehype-ap-btn.secondary {
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+}
+
+.dehype-ap-btn.secondary:hover {
+    background: rgba(168, 85, 247, 0.2);
+}

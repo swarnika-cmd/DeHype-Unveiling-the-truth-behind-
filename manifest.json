@@ -1,20 +1,23 @@
 {
     "manifest_version": 3,
-    "name": "DeHype - Clickbait Remover",
-    "version": "1.0",
-    "description": "Replaces clickbait titles with factual AI summaries",
+    "name": "DeHype Pro — AI Content Intelligence",
+    "version": "2.0.0",
+    "description": "Fight clickbait on YouTube & analyze any webpage with AI-powered summaries, smart tags, sentiment analysis, credibility scoring, and intelligent suggestions — powered by Google Gemini",
     "permissions": [
         "activeTab",
         "storage",
-        "scripting"
+        "scripting",
+        "tabs",
+        "contextMenus"
     ],
     "host_permissions": [
         "*://*.youtube.com/*",
+        "<all_urls>",
         "https://generativelanguage.googleapis.com/*"
     ],
     "action": {
         "default_popup": "popup/popup.html",
-        "default_title": "DeHype Settings"
+        "default_title": "DeHype Pro — AI Content Intelligence"
     },
     "content_scripts": [
         {
@@ -23,6 +26,18 @@
             ],
             "js": [
                 "scripts/content.js"
+            ],
+            "run_at": "document_end"
+        },
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "scripts/page-analyzer.js"
+            ],
+            "css": [
+                "scripts/analyzer-panel.css"
             ],
             "run_at": "document_end"
         }

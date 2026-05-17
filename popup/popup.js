@@ -161,7 +161,7 @@ async function runFullAnalysis(content, title, url) {
   const apiKey = await getApiKey();
   if (!apiKey) {
     hideLoading();
-    showError("No API key configured. Go to Settings → Save your Gemini API Key.");
+    showError("No API key configured. Go to Settings → Save your Groq API Key.");
     return;
   }
 
@@ -170,12 +170,12 @@ async function runFullAnalysis(content, title, url) {
   try {
     // Run all analyses in parallel for speed (inspired by SmartContent's Promise.all pattern)
     const [summaryResult, tagsResult, suggestionsResult, credibilityResult, sentimentResult, clickbaitResult] = await Promise.all([
-      callGeminiAPI(apiKey, buildSummaryPrompt(truncated, title)),
-      callGeminiAPI(apiKey, buildTagsPrompt(truncated)),
-      callGeminiAPI(apiKey, buildSuggestionsPrompt(truncated, title)),
-      callGeminiAPI(apiKey, buildCredibilityPrompt(truncated, title, url)),
-      callGeminiAPI(apiKey, buildSentimentPrompt(truncated, title)),
-      callGeminiAPI(apiKey, buildClickbaitPrompt(title, truncated))
+      callGroqAPI(apiKey, buildSummaryPrompt(truncated, title)),
+      callGroqAPI(apiKey, buildTagsPrompt(truncated)),
+      callGroqAPI(apiKey, buildSuggestionsPrompt(truncated, title)),
+      callGroqAPI(apiKey, buildCredibilityPrompt(truncated, title, url)),
+      callGroqAPI(apiKey, buildSentimentPrompt(truncated, title)),
+      callGroqAPI(apiKey, buildClickbaitPrompt(title, truncated))
     ]);
 
     hideLoading();
@@ -207,21 +207,24 @@ async function runFullAnalysis(content, title, url) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  GEMINI API INTEGRATION
+//  GROQ API INTEGRATION
 // ═══════════════════════════════════════════════════════════
 
-async function callGeminiAPI(apiKey, prompt) {
+async function callGroqAPI(apiKey, prompt) {
   const response = await new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({
       type: 'DEHYPE_FETCH_URL',
-      url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      url: 'https://api.groq.com/openai/v1/chat/completions',
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
       body: {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 500
-        }
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
@@ -239,10 +242,10 @@ async function callGeminiAPI(apiKey, prompt) {
     try { json = JSON.parse(json); } catch (e) { /* */ }
   }
 
-  if (json.error) throw new Error(json.error.message);
-  if (!json.candidates || json.candidates.length === 0) throw new Error("No response from AI");
+  if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+  if (!json.choices || json.choices.length === 0) throw new Error("No response from AI");
 
-  return json.candidates[0].content?.parts?.[0]?.text || "";
+  return json.choices[0].message?.content || "";
 }
 
 // ═══════════════════════════════════════════════════════════

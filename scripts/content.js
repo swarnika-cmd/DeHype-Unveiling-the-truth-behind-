@@ -286,7 +286,7 @@ async function runVideoAnalysis(transcript, statusEl, dotEl, resultsEl) {
     try {
         // Parallel analysis calls (SmartContent pattern)
         const [summary, tags, sentiment, clickbait] = await Promise.all([
-            callGemini(key, `You are a helpful assistant that removes clickbait. 
+            callGroq(key, `You are a helpful assistant that removes clickbait. 
 Title: "${title}"
 Transcript: "${truncated}"
 
@@ -294,11 +294,11 @@ Write a single sentence summary (max 20 words) that reveals the actual answer or
 
 Output:`),
 
-            callGemini(key, `Generate exactly 5 relevant topic tags for this YouTube video transcript. Return ONLY the tags as a comma-separated list.
+            callGroq(key, `Generate exactly 5 relevant topic tags for this YouTube video transcript. Return ONLY the tags as a comma-separated list.
 Transcript: "${truncated}"
 Tags:`),
 
-            callGemini(key, `Analyze the emotional manipulation tactics in this YouTube video title and content.
+            callGroq(key, `Analyze the emotional manipulation tactics in this YouTube video title and content.
 Title: "${title}"
 Transcript: "${truncated}"
 
@@ -306,7 +306,7 @@ Respond in this EXACT format (2 lines):
 TONE: [one word: Neutral/Positive/Negative/Manipulative/Sensational/Informative]
 ANALYSIS: [1 sentence about emotional tactics used]`),
 
-            callGemini(key, `Rate how clickbaity this YouTube title is compared to the actual content.
+            callGroq(key, `Rate how clickbaity this YouTube title is compared to the actual content.
 Title: "${title}"
 Transcript: "${truncated}"
 
@@ -400,7 +400,7 @@ VERDICT: [1 sentence explaining the clickbait tactics used or why the title is h
         dotEl.style.boxShadow = "0 0 12px rgba(168, 85, 247, 0.7)";
 
     } catch (e) {
-        console.error("Gemini Error:", e);
+        console.error("Groq Error:", e);
         statusEl.innerText = "AI Error";
         dotEl.style.background = "#ef4444";
     }
@@ -419,7 +419,7 @@ async function analyzeTextInline(text, statusEl, dotEl, resultsEl) {
     dotEl.style.background = "#06b6d4";
 
     try {
-        const result = await callGemini(key, `Analyze this text concisely:
+        const result = await callGroq(key, `Analyze this text concisely:
 "${text.substring(0, 3000)}"
 
 Provide:
@@ -497,20 +497,23 @@ async function scanAllTitles(statusEl) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  GEMINI API CALLER
+//  GROQ API CALLER
 // ═══════════════════════════════════════════════════════════
 
-async function callGemini(apiKey, prompt) {
+async function callGroq(apiKey, prompt) {
     const response = await chrome.runtime.sendMessage({
         type: 'DEHYPE_FETCH_URL',
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        url: 'https://api.groq.com/openai/v1/chat/completions',
         method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
         body: {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 0.3,
-                maxOutputTokens: 500
-            }
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+            max_tokens: 500
         }
     });
 
@@ -521,10 +524,10 @@ async function callGemini(apiKey, prompt) {
         try { json = JSON.parse(json); } catch (e) { /* */ }
     }
 
-    if (json.error) throw new Error(json.error.message);
-    if (!json.candidates || json.candidates.length === 0) throw new Error("No AI response");
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+    if (!json.choices || json.choices.length === 0) throw new Error("No AI response");
 
-    return json.candidates[0].content?.parts?.[0]?.text || "";
+    return json.choices[0].message?.content || "";
 }
 
 // ── Utility ──

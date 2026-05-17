@@ -148,7 +148,7 @@ async function analyzeCurrentPage() {
 
     if (!apiKey) {
         if (contentArea) {
-            contentArea.innerHTML = `<div class="dehype-ap-error">⚠️ No API key. Open DeHype popup → Settings → Save your Gemini API Key.</div>`;
+            contentArea.innerHTML = `<div class="dehype-ap-error">⚠️ No API key. Open DeHype popup → Settings → Save your Groq API Key.</div>`;
         }
         return;
     }
@@ -162,17 +162,17 @@ async function analyzeCurrentPage() {
     try {
         // Run analyses in parallel
         const analyses = [
-            callGeminiFromContent(apiKey, buildPageSummaryPrompt(pageContent, pageTitle)),
-            callGeminiFromContent(apiKey, buildPageTagsPrompt(pageContent)),
-            callGeminiFromContent(apiKey, buildPageSuggestionsPrompt(pageContent, pageTitle))
+            callGroqFromContent(apiKey, buildPageSummaryPrompt(pageContent, pageTitle)),
+            callGroqFromContent(apiKey, buildPageTagsPrompt(pageContent)),
+            callGroqFromContent(apiKey, buildPageSuggestionsPrompt(pageContent, pageTitle))
         ];
 
         // Conditionally add credibility & sentiment
         if (data.featureCredibility !== false) {
-            analyses.push(callGeminiFromContent(apiKey, buildPageCredibilityPrompt(pageContent, pageTitle, pageUrl)));
+            analyses.push(callGroqFromContent(apiKey, buildPageCredibilityPrompt(pageContent, pageTitle, pageUrl)));
         }
         if (data.featureSentiment !== false) {
-            analyses.push(callGeminiFromContent(apiKey, buildPageSentimentPrompt(pageContent, pageTitle)));
+            analyses.push(callGroqFromContent(apiKey, buildPageSentimentPrompt(pageContent, pageTitle)));
         }
 
         const results = await Promise.all(analyses);
@@ -306,7 +306,7 @@ async function analyzeSelectedText(text) {
     }
 
     try {
-        const result = await callGeminiFromContent(apiKey, `Analyze this text:
+        const result = await callGroqFromContent(apiKey, `Analyze this text:
 "${text.substring(0, 5000)}"
 
 Provide a concise analysis with:
@@ -380,18 +380,24 @@ ANALYSIS: [1 sentence about tone and any manipulation]`;
 }
 
 // ═══════════════════════════════════════════════════════════
-//  GEMINI API
+//  GROQ API
 // ═══════════════════════════════════════════════════════════
 
-async function callGeminiFromContent(apiKey, prompt) {
+async function callGroqFromContent(apiKey, prompt) {
     return new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
             type: 'DEHYPE_FETCH_URL',
-            url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            url: 'https://api.groq.com/openai/v1/chat/completions',
             method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
             body: {
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+                model: 'llama-3.3-70b-versatile',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.3,
+                max_tokens: 500
             }
         }, (response) => {
             if (chrome.runtime.lastError) {
@@ -408,10 +414,10 @@ async function callGeminiFromContent(apiKey, prompt) {
                 try { json = JSON.parse(json); } catch (e) { /* */ }
             }
 
-            if (json.error) { reject(new Error(json.error.message)); return; }
-            if (!json.candidates || json.candidates.length === 0) { reject(new Error("No AI response")); return; }
+            if (json.error) { reject(new Error(json.error.message || JSON.stringify(json.error))); return; }
+            if (!json.choices || json.choices.length === 0) { reject(new Error("No AI response")); return; }
 
-            resolve(json.candidates[0].content?.parts?.[0]?.text || "");
+            resolve(json.choices[0].message?.content || "");
         });
     });
 }

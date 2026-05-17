@@ -97,6 +97,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const headers = {
             "Content-Type": "application/json"
         };
+        // Merge any custom headers (e.g. Authorization for Groq API)
+        if (request.headers) {
+            Object.assign(headers, request.headers);
+        }
         if (referer) {
             headers['Referer'] = referer;
         }

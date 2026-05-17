@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "DeHype Pro — AI Content Intelligence",
     "version": "2.0.0",
-    "description": "Fight clickbait on YouTube & analyze any webpage with AI-powered summaries, smart tags, sentiment analysis, credibility scoring, and intelligent suggestions — powered by Google Gemini",
+    "description": "Fight clickbait on YouTube & analyze any webpage with AI-powered summaries, smart tags, sentiment analysis, credibility scoring, and intelligent suggestions — powered by Groq AI",
     "permissions": [
         "activeTab",
         "storage",
@@ -13,7 +13,7 @@
     "host_permissions": [
         "*://*.youtube.com/*",
         "<all_urls>",
-        "https://generativelanguage.googleapis.com/*"
+        "https://api.groq.com/*"
     ],
     "action": {
         "default_popup": "popup/popup.html",

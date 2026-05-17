@@ -2,7 +2,7 @@
 
 > **Unveil the truth behind the hype. Everywhere.**
 
-DeHype Pro is a **Chrome Extension** that uses AI (Google Gemini) to fight misinformation, clickbait, and manipulation across the entire web. Originally built to de-clickbait YouTube titles, it has evolved into a **full-spectrum AI content intelligence engine** — analyzing any webpage for credibility, sentiment, bias, and more.
+DeHype Pro is a **Chrome Extension** that uses AI to fight misinformation, clickbait, and manipulation across the entire web. Originally built to de-clickbait YouTube titles, it has evolved into a **full-spectrum AI content intelligence engine** — analyzing any webpage for credibility, sentiment, bias, and more.
 
 ---
 

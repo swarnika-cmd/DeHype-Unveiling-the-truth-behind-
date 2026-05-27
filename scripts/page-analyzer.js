@@ -143,70 +143,56 @@ async function analyzeCurrentPage() {
         `;
     }
 
-    const data = await chrome.storage.local.get(['dehypeApiKey', 'featureCredibility', 'featureSentiment']);
-    const apiKey = data.dehypeApiKey;
-
-    if (!apiKey) {
-        if (contentArea) {
-            contentArea.innerHTML = `<div class="dehype-ap-error">⚠️ No API key. Open DeHype popup → Settings → Save your Groq API Key.</div>`;
-        }
-        return;
-    }
+    const storage = await chrome.storage.local.get(['dehypeApiKey', 'dehypeProxyUrl', 'featureCredibility', 'featureSentiment']);
+    const apiKey = storage.dehypeApiKey;
+    const proxyUrl = storage.dehypeProxyUrl || 'http://localhost:3000';
 
     // Extract page content
     const pageTitle = document.title;
     const pageUrl = window.location.href;
     const pageContent = document.body.innerText.substring(0, 8000);
-    const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
 
     try {
-        // Run analyses in parallel
-        const analyses = [
-            callGroqFromContent(apiKey, buildPageSummaryPrompt(pageContent, pageTitle)),
-            callGroqFromContent(apiKey, buildPageTagsPrompt(pageContent)),
-            callGroqFromContent(apiKey, buildPageSuggestionsPrompt(pageContent, pageTitle))
-        ];
+        const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'DEHYPE_ANALYZE_REQUEST',
+                url: `${proxyUrl}/api/analyze`,
+                body: {
+                    content: pageContent,
+                    title: pageTitle,
+                    url: pageUrl,
+                    type: 'page'
+                },
+                customKey: apiKey
+            }, (res) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve(res);
+                }
+            });
+        });
 
-        // Conditionally add credibility & sentiment
-        if (data.featureCredibility !== false) {
-            analyses.push(callGroqFromContent(apiKey, buildPageCredibilityPrompt(pageContent, pageTitle, pageUrl)));
+        if (!response || !response.success) {
+            throw new Error(response?.error || 'Failed to get analysis from proxy.');
         }
-        if (data.featureSentiment !== false) {
-            analyses.push(callGroqFromContent(apiKey, buildPageSentimentPrompt(pageContent, pageTitle)));
-        }
 
-        const results = await Promise.all(analyses);
-
-        const [summary, tags, suggestions] = results;
-        const credibility = results[3] || null;
-        const sentiment = results[4] || null;
+        const result = response.data;
 
         // Parse tags
-        const tagList = tags.replace(/^Tags:?\s*/i, '').split(',').map(t => t.trim()).filter(t => t);
+        const tagList = Array.isArray(result.tags) ? result.tags : [];
 
         // Parse suggestions
-        const suggestionList = suggestions.split('\n')
-            .map(s => s.replace(/^[-•*]\s*/, '').trim())
-            .filter(s => s.length > 5);
+        const suggestionList = Array.isArray(result.suggestions) ? result.suggestions : [];
 
         // Parse credibility
-        let credScore = 0, credLabel = '', credExplanation = '';
-        if (credibility) {
-            credibility.split('\n').forEach(line => {
-                if (line.startsWith('SCORE:')) credScore = parseInt(line.replace('SCORE:', '').trim()) || 0;
-                if (line.startsWith('LABEL:')) credLabel = line.replace('LABEL:', '').trim();
-                if (line.startsWith('EXPLANATION:')) credExplanation = line.replace('EXPLANATION:', '').trim();
-            });
-        }
+        const credScore = result.credibility?.score || 0;
+        const credLabel = result.credibility?.label || '';
+        const credExplanation = result.credibility?.explanation || '';
 
         // Parse sentiment
-        let sentScore = 50, sentAnalysis = '';
-        if (sentiment) {
-            sentiment.split('\n').forEach(line => {
-                if (line.startsWith('SCORE:')) sentScore = parseInt(line.replace('SCORE:', '').trim()) || 50;
-                if (line.startsWith('ANALYSIS:')) sentAnalysis = line.replace('ANALYSIS:', '').trim();
-            });
-        }
+        const sentScore = result.sentiment?.score || 50;
+        const sentAnalysis = result.sentiment?.analysis || '';
 
         // Render
         const credScoreColor = credScore >= 70 ? '#10b981' : credScore >= 40 ? '#f59e0b' : '#ef4444';
@@ -215,9 +201,9 @@ async function analyzeCurrentPage() {
             contentArea.innerHTML = `
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">📝 Summary</div>
-                    <div class="dehype-ap-text">${summary.replace(/^Summary:?\s*/i, '').trim()}</div>
+                    <div class="dehype-ap-text">${result.summary || ''}</div>
                 </div>
-                ${credibility ? `
+                ${storage.featureCredibility !== false ? `
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">🛡️ Credibility</div>
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
@@ -229,7 +215,7 @@ async function analyzeCurrentPage() {
                     </div>
                     <div class="dehype-ap-sub">${credExplanation}</div>
                 </div>` : ''}
-                ${sentiment ? `
+                ${storage.featureSentiment !== false ? `
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">💬 Sentiment</div>
                     <div class="dehype-ap-sentiment-bar">
@@ -250,21 +236,21 @@ async function analyzeCurrentPage() {
         }
 
         // Save to history
-        chrome.storage.local.get('dehypeHistory', (result) => {
-            const history = result.dehypeHistory || [];
+        chrome.storage.local.get('dehypeHistory', (historyResult) => {
+            const history = historyResult.dehypeHistory || [];
             history.unshift({
                 title: pageTitle,
                 url: pageUrl,
                 timestamp: Date.now(),
                 credibility: credScore,
-                summary: summary.substring(0, 100)
+                summary: (result.summary || '').substring(0, 100)
             });
             chrome.storage.local.set({ dehypeHistory: history.slice(0, 50) });
         });
 
         // Update stats
-        chrome.storage.local.get('dehypeStats', (result) => {
-            const stats = result.dehypeStats || { totalAnalyzed: 0, clickbaitCaught: 0 };
+        chrome.storage.local.get('dehypeStats', (statsResult) => {
+            const stats = statsResult.dehypeStats || { totalAnalyzed: 0, clickbaitCaught: 0 };
             stats.totalAnalyzed++;
             chrome.storage.local.set({ dehypeStats: stats });
         });
@@ -295,34 +281,45 @@ async function analyzeSelectedText(text) {
         `;
     }
 
-    const data = await chrome.storage.local.get('dehypeApiKey');
-    const apiKey = data.dehypeApiKey;
-
-    if (!apiKey) {
-        if (contentArea) {
-            contentArea.innerHTML = `<div class="dehype-ap-error">⚠️ No API key configured.</div>`;
-        }
-        return;
-    }
+    const storage = await chrome.storage.local.get(['dehypeApiKey', 'dehypeProxyUrl']);
+    const apiKey = storage.dehypeApiKey;
+    const proxyUrl = storage.dehypeProxyUrl || 'http://localhost:3000';
 
     try {
-        const result = await callGroqFromContent(apiKey, `Analyze this text:
-"${text.substring(0, 5000)}"
+        const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'DEHYPE_ANALYZE_REQUEST',
+                url: `${proxyUrl}/api/analyze`,
+                body: {
+                    content: text.substring(0, 5000),
+                    type: 'text'
+                },
+                customKey: apiKey
+            }, (res) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve(res);
+                }
+            });
+        });
 
-Provide a concise analysis with:
-1. One-line summary
-2. Key topic
-3. Sentiment (Positive/Negative/Neutral)
-4. Credibility assessment (if applicable)
-5. Any bias or manipulation detected
+        if (!response || !response.success) {
+            throw new Error(response?.error || 'Failed to analyze text.');
+        }
 
-Format each on its own line with a label.`);
+        const result = response.data;
 
         if (contentArea) {
             contentArea.innerHTML = `
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">📝 Selected Text Analysis</div>
-                    <div class="dehype-ap-text" style="white-space:pre-line">${result}</div>
+                    <div class="dehype-ap-text">
+                        <strong>Summary:</strong> ${result.summary || ''}<br><br>
+                        <strong>Topic:</strong> ${result.topic || ''}<br><br>
+                        <strong>Sentiment:</strong> ${result.sentiment || ''}<br><br>
+                        <strong>Manipulation:</strong> ${result.manipulation || ''}
+                    </div>
                 </div>
             `;
         }
@@ -333,80 +330,6 @@ Format each on its own line with a label.`);
     }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  PROMPTS
-// ═══════════════════════════════════════════════════════════
-
-function buildPageSummaryPrompt(content, title) {
-    return `Provide a concise, factual summary (3-4 sentences) of this webpage content. Be objective.
-Title: "${title}"
-Content: "${content}"
-Summary:`;
-}
-
-function buildPageTagsPrompt(content) {
-    return `Generate exactly 6 relevant topic tags for this content. Return ONLY tags as comma-separated list.
-Content: "${content}"
-Tags:`;
-}
-
-function buildPageSuggestionsPrompt(content, title) {
-    return `Based on this content, provide 3 actionable insights or suggestions. Each on a new line starting with a dash (-).
-Title: "${title}"
-Content: "${content}"
-Suggestions:`;
-}
-
-function buildPageCredibilityPrompt(content, title, url) {
-    return `Analyze this content for credibility.
-Title: "${title}"
-URL: "${url}"
-Content: "${content}"
-
-Respond in EXACT format (3 lines):
-SCORE: [0-100]
-LABEL: [Very Low|Low|Moderate|High|Very High]
-EXPLANATION: [1 sentence]`;
-}
-
-function buildPageSentimentPrompt(content, title) {
-    return `Analyze emotional tone of this content.
-Title: "${title}"
-Content: "${content}"
-
-Respond in EXACT format (2 lines):
-SCORE: [0-100, 0=negative, 50=neutral, 100=positive]
-ANALYSIS: [1 sentence about tone and any manipulation]`;
-}
-
-// ═══════════════════════════════════════════════════════════
-//  GROQ API
-// ═══════════════════════════════════════════════════════════
-
-async function callGroqFromContent(apiKey, prompt) {
-    return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({
-            type: 'DEHYPE_FETCH_URL',
-            url: 'https://api.groq.com/openai/v1/chat/completions',
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: {
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.3,
-                max_tokens: 500
-            }
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-            }
-            if (!response || !response.success) {
-                reject(new Error(response?.error || 'Unknown error'));
-                return;
             }
 
             let json = response.data;

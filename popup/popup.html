@@ -75,19 +75,27 @@
         </div>
       </div>
 
-      <!-- API Key -->
+      <!-- API Proxy & Key -->
       <div class="card">
-        <h3>Groq API Key</h3>
-        <p class="hint">Required for AI analysis. Get yours free from <a href="https://console.groq.com/keys" target="_blank">Groq Console</a></p>
+        <h3>API Connection Settings</h3>
+        
+        <label for="proxyUrl" style="display:block;margin-top:10px;font-size:12px;font-weight:600;color:#c084fc;">Backend Proxy URL</label>
+        <p class="hint">URL of your DeHype backend proxy. Default: <code>http://localhost:3000</code></p>
+        <div class="input-group" style="margin-bottom:14px;">
+          <input type="text" id="proxyUrl" placeholder="http://localhost:3000" autocomplete="off" style="width:100%;">
+        </div>
+
+        <label for="apiKey" style="display:block;font-size:12px;font-weight:600;color:#c084fc;">Custom Groq API Key (Optional)</label>
+        <p class="hint">Overrides the server key. Get free from <a href="https://console.groq.com/keys" target="_blank">Groq Console</a></p>
         <div class="input-group">
           <input type="password" id="apiKey" placeholder="gsk_..." autocomplete="off">
           <button class="btn-icon" id="toggleKeyVisibility" title="Show/Hide">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
-        <button class="btn-primary" id="saveBtn">
+        <button class="btn-primary" id="saveBtn" style="margin-top: 12px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          Save Key
+          Save Settings
         </button>
         <div class="msg" id="msg"></div>
       </div>

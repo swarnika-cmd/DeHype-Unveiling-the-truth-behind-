@@ -1,0 +1,17 @@
+{
+  "name": "dehype-proxy",
+  "version": "1.0.0",
+  "description": "Backend proxy for DeHype Pro extension to sign and route Groq requests securely",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "groq-sdk": "^0.13.0"
+  }
+}

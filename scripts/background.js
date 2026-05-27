@@ -85,6 +85,53 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // ── Universal Message Handler (CORS Proxy + Page Analysis) ──
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Proxy request router for backend DeHype server
+    if (request.type === 'DEHYPE_ANALYZE_REQUEST') {
+        const url = request.url;
+        const method = 'POST';
+        const body = request.body ? JSON.stringify(request.body) : null;
+        
+        console.log(`DeHype BG Proxy: Requesting ${url} (type: ${request.body?.type})`);
+
+        const headers = {
+            "Content-Type": "application/json"
+        };
+        
+        if (request.customKey) {
+            headers["Authorization"] = `Bearer ${request.customKey}`;
+        }
+
+        fetch(url, {
+            method: method,
+            headers: headers,
+            body: body
+        })
+        .then(async response => {
+            const text = await response.text();
+            console.log(`DeHype BG Proxy: Response Status ${response.status}`);
+            
+            let data = text;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                // Not JSON
+            }
+            
+            if (response.ok) {
+                sendResponse({ success: true, data: data });
+            } else {
+                const errMsg = (data && data.error) ? data.error : `HTTP ${response.status}: ${text}`;
+                sendResponse({ success: false, error: errMsg });
+            }
+        })
+        .catch(error => {
+            console.error("DeHype BG Proxy Error:", error);
+            sendResponse({ success: false, error: error.toString() });
+        });
+
+        return true; // Keep channel open
+    }
+
     // CORS Proxy Fetcher (used by content scripts & popup)
     if (request.type === 'DEHYPE_FETCH_URL') {
         const url = request.url;

@@ -10,18 +10,71 @@ console.log("DeHype Pro: YouTube content script loaded!");
 let extensionEnabled = true;
 let featureYoutube = true;
 let apiKey = null;
+let proxyUrl = 'http://localhost:3000';
+let pendingTranscriptPromise = null;
+let currentCleanTitle = null;
 
-chrome.storage.local.get(['dehypeEnabled', 'featureYoutube', 'dehypeApiKey'], (result) => {
+chrome.storage.local.get(['dehypeEnabled', 'featureYoutube', 'dehypeApiKey', 'dehypeProxyUrl'], (result) => {
     extensionEnabled = result.dehypeEnabled !== false;
     featureYoutube = result.featureYoutube !== false;
     apiKey = result.dehypeApiKey;
+    proxyUrl = result.dehypeProxyUrl || 'http://localhost:3000';
 
     if (extensionEnabled && featureYoutube) {
         initDeHype();
     }
 });
 
+// Setup window listener to receive message from injected.js running in page world
+window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    if (event.data && event.data.type === 'DEHYPE_DATA') {
+        if (pendingTranscriptPromise) {
+            if (event.data.error) {
+                pendingTranscriptPromise.reject(new Error(event.data.error));
+            } else if (event.data.tracks) {
+                pendingTranscriptPromise.resolve(event.data.tracks);
+            } else {
+                pendingTranscriptPromise.reject(new Error('Unknown response from page player.'));
+            }
+            pendingTranscriptPromise = null;
+        }
+    }
+});
+
+function injectScript() {
+    if (document.getElementById('dehype-injected-script')) return;
+    const script = document.createElement('script');
+    script.id = 'dehype-injected-script';
+    script.src = chrome.runtime.getURL('scripts/injected.js');
+    (document.head || document.documentElement).appendChild(script);
+}
+
+function requestCaptionsFromPage() {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingTranscriptPromise = null;
+            reject(new Error("Timeout waiting for captions player data."));
+        }, 3000);
+
+        pendingTranscriptPromise = {
+            resolve: (tracks) => {
+                clearTimeout(timeout);
+                resolve(tracks);
+            },
+            reject: (err) => {
+                clearTimeout(timeout);
+                reject(err);
+            }
+        };
+
+        window.postMessage({ type: 'DEHYPE_REQ_PLAYER_RESPONSE' }, '*');
+    });
+}
+
 function initDeHype() {
+    injectScript();
+
     // ── Create Enhanced UI Panel ──
     const panel = document.createElement('div');
     panel.id = 'dehype-panel';
@@ -191,7 +244,7 @@ function initDeHype() {
     });
 
     // ── Analyze current video ──
-    fetchBtn.addEventListener('click', () => fetchTranscriptViaDOM(statusEl, dotEl, resultsEl));
+    fetchBtn.addEventListener('click', () => fetchTranscript(statusEl, dotEl, resultsEl));
 
     // ── Scan all visible titles ──
     scanBtn.addEventListener('click', () => scanAllTitles(statusEl));
@@ -203,15 +256,59 @@ function initDeHype() {
         }
         if (msg.type === 'DEHYPE_AUTO_ANALYZE') {
             if (window.location.href.includes('youtube.com/watch')) {
-                setTimeout(() => fetchTranscriptViaDOM(statusEl, dotEl, resultsEl), 2000);
+                setTimeout(() => fetchTranscript(statusEl, dotEl, resultsEl), 2000);
             }
         }
     });
 }
 
 // ═══════════════════════════════════════════════════════════
-//  TRANSCRIPT FETCHER (Original DeHype core)
+//  TRANSCRIPT FETCHER & ANALYSIS PIPELINE
 // ═══════════════════════════════════════════════════════════
+
+async function fetchTranscript(statusEl, dotEl, resultsEl) {
+    statusEl.innerText = "Extracting transcript...";
+    dotEl.style.background = "#f59e0b";
+
+    try {
+        // 1. Try injected script player response first (silent & fast)
+        const tracks = await requestCaptionsFromPage();
+        
+        // Find preferred English track or fallback to first track
+        const track = tracks.find(t => t.languageCode === 'en') || tracks[0];
+        if (!track || !track.baseUrl) {
+            throw new Error("No caption tracks available.");
+        }
+
+        statusEl.innerText = "Loading transcript...";
+        
+        // Fetch JSON captions directly from YouTube API (MV3 content script has cross-origin permissions for YouTube)
+        const response = await fetch(track.baseUrl + '&fmt=json3');
+        if (!response.ok) throw new Error("Failed to fetch caption data from YouTube server.");
+        
+        const data = await response.json();
+        const fullText = data.events
+            .filter(e => e.segs)
+            .map(e => e.segs.map(s => s.utf8).join(''))
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (fullText.length < 50) {
+            throw new Error("Transcript text is too short.");
+        }
+
+        statusEl.innerText = "AI analyzing...";
+        dotEl.style.background = "#06b6d4";
+
+        await runVideoAnalysis(fullText, statusEl, dotEl, resultsEl);
+
+    } catch (e) {
+        console.warn("DeHype captions fetch via player failed, trying DOM scraping: ", e.message);
+        // 2. Fallback to brittle DOM method if player response captions failed
+        await fetchTranscriptViaDOM(statusEl, dotEl, resultsEl);
+    }
+}
 
 async function fetchTranscriptViaDOM(statusEl, dotEl, resultsEl) {
     statusEl.innerText = "Opening transcript...";
@@ -260,63 +357,56 @@ async function fetchTranscriptViaDOM(statusEl, dotEl, resultsEl) {
         await runVideoAnalysis(fullText, statusEl, dotEl, resultsEl);
 
     } catch (e) {
-        console.error("DeHype Error:", e);
+        console.error("DeHype DOM Scraper Error:", e);
         statusEl.innerText = "Error: " + e.message;
         dotEl.style.background = "#ef4444";
     }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  VIDEO ANALYSIS (Enhanced with SmartContent features)
+//  VIDEO ANALYSIS (Consolidated Proxy API Call)
 // ═══════════════════════════════════════════════════════════
 
 async function runVideoAnalysis(transcript, statusEl, dotEl, resultsEl) {
-    const data = await chrome.storage.local.get('dehypeApiKey');
-    const key = data.dehypeApiKey;
-
-    if (!key) {
-        statusEl.innerText = "No API Key!";
-        dotEl.style.background = "#ef4444";
-        return;
-    }
-
-    const truncated = transcript.substring(0, 12000);
     const title = document.title.replace(' - YouTube', '');
+    
+    // Retrieve latest proxy configurations
+    const storage = await new Promise((resolve) => {
+        chrome.storage.local.get(['dehypeApiKey', 'dehypeProxyUrl'], resolve);
+    });
+    
+    const customKey = storage.dehypeApiKey;
+    const activeProxyUrl = storage.dehypeProxyUrl || 'http://localhost:3000';
 
     try {
-        // Parallel analysis calls (SmartContent pattern)
-        const [summary, tags, sentiment, clickbait] = await Promise.all([
-            callGroq(key, `You are a helpful assistant that removes clickbait. 
-Title: "${title}"
-Transcript: "${truncated}"
+        const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'DEHYPE_ANALYZE_REQUEST',
+                url: `${activeProxyUrl}/api/analyze`,
+                body: {
+                    content: transcript.substring(0, 12000),
+                    title: title,
+                    url: window.location.href,
+                    type: 'video'
+                },
+                customKey: customKey
+            }, (res) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve(res);
+                }
+            });
+        });
 
-Write a single sentence summary (max 20 words) that reveals the actual answer or core topic. Be factual and dry. Do not start with "The video explains".
+        if (!response || !response.success) {
+            throw new Error(response?.error || 'Failed to get analysis from proxy.');
+        }
 
-Output:`),
+        const result = response.data;
+        const cleanSummary = (result.summary || '').trim();
 
-            callGroq(key, `Generate exactly 5 relevant topic tags for this YouTube video transcript. Return ONLY the tags as a comma-separated list.
-Transcript: "${truncated}"
-Tags:`),
-
-            callGroq(key, `Analyze the emotional manipulation tactics in this YouTube video title and content.
-Title: "${title}"
-Transcript: "${truncated}"
-
-Respond in this EXACT format (2 lines):
-TONE: [one word: Neutral/Positive/Negative/Manipulative/Sensational/Informative]
-ANALYSIS: [1 sentence about emotional tactics used]`),
-
-            callGroq(key, `Rate how clickbaity this YouTube title is compared to the actual content.
-Title: "${title}"
-Transcript: "${truncated}"
-
-Respond in this EXACT format (2 lines):
-SCORE: [number 0-100 where 0=honest, 100=extreme clickbait]
-VERDICT: [1 sentence explaining the clickbait tactics used or why the title is honest]`)
-        ]);
-
-        // ── Replace Title (Original DeHype feature) ──
-        const cleanSummary = summary.replace(/^Output:?\s*/i, '').trim();
+        // ── Replace Title & Observer ──
         const titleSelectors = [
             "h1.ytd-watch-metadata yt-formatted-string",
             "#title > h1 > yt-formatted-string",
@@ -329,37 +419,23 @@ VERDICT: [1 sentence explaining the clickbait tactics used or why the title is h
             if (el) { titleElement = el; break; }
         }
 
-        if (titleElement) {
+        if (titleElement && cleanSummary) {
             if (!titleElement.getAttribute('data-original-title')) {
                 titleElement.setAttribute('data-original-title', titleElement.innerText);
             }
-            titleElement.innerText = "✨ " + cleanSummary;
-            titleElement.style.textShadow = "0 0 10px rgba(168, 85, 247, 0.3)";
+            keepTitleClean(titleElement, cleanSummary);
             document.title = "✨ " + cleanSummary + " - YouTube";
         }
 
-        // ── Parse clickbait score ──
-        let clickbaitScore = 0;
-        let clickbaitVerdict = '';
-        clickbait.split('\n').forEach(line => {
-            if (line.startsWith('SCORE:')) clickbaitScore = parseInt(line.replace('SCORE:', '').trim()) || 0;
-            if (line.startsWith('VERDICT:')) clickbaitVerdict = line.replace('VERDICT:', '').trim();
-        });
-
-        // ── Parse sentiment ──
-        let sentimentTone = '';
-        let sentimentAnalysis = '';
-        sentiment.split('\n').forEach(line => {
-            if (line.startsWith('TONE:')) sentimentTone = line.replace('TONE:', '').trim();
-            if (line.startsWith('ANALYSIS:')) sentimentAnalysis = line.replace('ANALYSIS:', '').trim();
-        });
-
-        // ── Parse tags ──
-        const tagList = tags.replace(/^Tags:?\s*/i, '').split(',').map(t => t.trim()).filter(t => t);
+        const clickbaitScore = result.clickbait?.score || 0;
+        const clickbaitVerdict = result.clickbait?.verdict || '';
+        const sentimentTone = result.sentiment?.tone || '';
+        const sentimentAnalysis = result.sentiment?.analysis || '';
+        const tagList = result.tags || [];
 
         // ── Update Stats ──
-        chrome.storage.local.get('dehypeStats', (result) => {
-            const stats = result.dehypeStats || { totalAnalyzed: 0, clickbaitCaught: 0 };
+        chrome.storage.local.get('dehypeStats', (resStats) => {
+            const stats = resStats.dehypeStats || { totalAnalyzed: 0, clickbaitCaught: 0 };
             stats.totalAnalyzed++;
             if (clickbaitScore > 50) stats.clickbaitCaught++;
             chrome.storage.local.set({ dehypeStats: stats });
@@ -400,10 +476,36 @@ VERDICT: [1 sentence explaining the clickbait tactics used or why the title is h
         dotEl.style.boxShadow = "0 0 12px rgba(168, 85, 247, 0.7)";
 
     } catch (e) {
-        console.error("Groq Error:", e);
+        console.error("Groq Proxy Error:", e);
         statusEl.innerText = "AI Error";
         dotEl.style.background = "#ef4444";
     }
+}
+
+function keepTitleClean(titleEl, cleanText) {
+    currentCleanTitle = cleanText;
+    
+    if (window.dehypeTitleObserver) {
+        window.dehypeTitleObserver.disconnect();
+    }
+    
+    titleEl.innerText = "✨ " + cleanText;
+    
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                if (titleEl.innerText !== "✨ " + currentCleanTitle) {
+                    observer.disconnect();
+                    titleEl.innerText = "✨ " + currentCleanTitle;
+                    observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+                    break;
+                }
+            }
+        }
+    });
+    
+    observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+    window.dehypeTitleObserver = observer;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -411,39 +513,59 @@ VERDICT: [1 sentence explaining the clickbait tactics used or why the title is h
 // ═══════════════════════════════════════════════════════════
 
 async function analyzeTextInline(text, statusEl, dotEl, resultsEl) {
-    const data = await chrome.storage.local.get('dehypeApiKey');
-    const key = data.dehypeApiKey;
-    if (!key) return;
-
     statusEl.innerText = "Analyzing selection...";
     dotEl.style.background = "#06b6d4";
 
+    const storage = await new Promise((resolve) => {
+        chrome.storage.local.get(['dehypeApiKey', 'dehypeProxyUrl'], resolve);
+    });
+    const customKey = storage.dehypeApiKey;
+    const activeProxyUrl = storage.dehypeProxyUrl || 'http://localhost:3000';
+
     try {
-        const result = await callGroq(key, `Analyze this text concisely:
-"${text.substring(0, 3000)}"
+        const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'DEHYPE_ANALYZE_REQUEST',
+                url: `${activeProxyUrl}/api/analyze`,
+                body: {
+                    content: text.substring(0, 3000),
+                    type: 'text'
+                },
+                customKey: customKey
+            }, (res) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve(res);
+                }
+            });
+        });
 
-Provide:
-1. A 1-sentence summary
-2. Key topic (1-2 words)
-3. Sentiment (Positive/Negative/Neutral)
-4. Any clickbait/manipulation detected (Yes/No + brief reason)
+        if (!response || !response.success) {
+            throw new Error(response?.error || 'Failed to analyze text.');
+        }
 
-Format:
-SUMMARY: [summary]
-TOPIC: [topic]
-SENTIMENT: [sentiment]
-MANIPULATION: [analysis]`);
+        const result = response.data;
 
         resultsEl.innerHTML = `
             <div style="position:relative">
                 <span class="dehype-close" onclick="document.getElementById('dehype-results').style.display='none'">&times;</span>
-                ${result.split('\n').filter(l => l.trim()).map(line => {
-                    const [key, ...val] = line.split(':');
-                    return `<div class="dehype-section">
-                        <div class="dehype-section-title">${key.trim()}</div>
-                        <div>${val.join(':').trim()}</div>
-                    </div>`;
-                }).join('')}
+                <div class="dehype-section">
+                    <div class="dehype-section-title">SUMMARY</div>
+                    <div>${result.summary || ''}</div>
+                </div>
+                <div class="dehype-section">
+                    <div class="dehype-section-title">TOPIC</div>
+                    <div>${result.topic || ''}</div>
+                </div>
+                <div class="dehype-section">
+                    <div class="dehype-section-title">SENTIMENT</div>
+                    <div>${result.sentiment || ''}</div>
+                </div>
+                <div class="dehype-section">
+                    <div class="dehype-section-title">MANIPULATION</div>
+                    <div>${result.manipulation || ''}</div>
+                </div>
             </div>
         `;
         resultsEl.style.display = 'block';
@@ -494,40 +616,6 @@ async function scanAllTitles(statusEl) {
     });
 
     statusEl.innerText = `Scanned ${processed} titles`;
-}
-
-// ═══════════════════════════════════════════════════════════
-//  GROQ API CALLER
-// ═══════════════════════════════════════════════════════════
-
-async function callGroq(apiKey, prompt) {
-    const response = await chrome.runtime.sendMessage({
-        type: 'DEHYPE_FETCH_URL',
-        url: 'https://api.groq.com/openai/v1/chat/completions',
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: {
-            model: 'llama-3.3-70b-versatile',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.3,
-            max_tokens: 500
-        }
-    });
-
-    if (!response.success) throw new Error(response.error);
-
-    let json = response.data;
-    if (typeof json === 'string') {
-        try { json = JSON.parse(json); } catch (e) { /* */ }
-    }
-
-    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
-    if (!json.choices || json.choices.length === 0) throw new Error("No AI response");
-
-    return json.choices[0].message?.content || "";
 }
 
 // ── Utility ──

@@ -52,12 +52,19 @@ featureToggles.forEach(id => {
 
 // ── Load Saved Settings ──
 document.addEventListener('DOMContentLoaded', () => {
-  const settingsKeys = ['dehypeApiKey', 'dehypeEnabled', ...featureToggles, 'dehypeHistory', 'dehypeStats'];
+  const settingsKeys = ['dehypeApiKey', 'dehypeProxyUrl', 'dehypeEnabled', ...featureToggles, 'dehypeHistory', 'dehypeStats'];
 
   chrome.storage.local.get(settingsKeys, (result) => {
     // API Key
     if (result.dehypeApiKey) {
       $('#apiKey').value = result.dehypeApiKey;
+    }
+
+    // Proxy URL
+    if (result.dehypeProxyUrl) {
+      $('#proxyUrl').value = result.dehypeProxyUrl;
+    } else {
+      $('#proxyUrl').value = 'http://localhost:3000';
     }
 
     // Master toggle
@@ -89,19 +96,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── Save API Key ──
+// ── Save Settings ──
 $('#saveBtn').addEventListener('click', () => {
   const key = $('#apiKey').value.trim();
+  const proxy = $('#proxyUrl').value.trim() || 'http://localhost:3000';
   const msg = $('#msg');
 
-  if (!key) {
-    msg.textContent = "Please enter a valid API key";
-    msg.style.color = "#ef4444";
-    return;
-  }
-
-  chrome.storage.local.set({ dehypeApiKey: key }, () => {
-    msg.textContent = "✓ API Key saved successfully!";
+  chrome.storage.local.set({ 
+    dehypeApiKey: key,
+    dehypeProxyUrl: proxy
+  }, () => {
+    msg.textContent = "✓ Connection settings saved!";
     msg.style.color = "#10b981";
     setTimeout(() => msg.textContent = "", 3000);
   });
@@ -159,42 +164,56 @@ $('#analyzeTextBtn').addEventListener('click', async () => {
 // ── Full Analysis Pipeline ──
 async function runFullAnalysis(content, title, url) {
   const apiKey = await getApiKey();
-  if (!apiKey) {
-    hideLoading();
-    showError("No API key configured. Go to Settings → Save your Groq API Key.");
-    return;
-  }
-
+  const storage = await new Promise((resolve) => {
+    chrome.storage.local.get(['dehypeProxyUrl'], resolve);
+  });
+  const proxyUrl = storage.dehypeProxyUrl || 'http://localhost:3000';
+  
   const truncated = content.substring(0, 10000);
 
   try {
-    // Run all analyses in parallel for speed (inspired by SmartContent's Promise.all pattern)
-    const [summaryResult, tagsResult, suggestionsResult, credibilityResult, sentimentResult, clickbaitResult] = await Promise.all([
-      callGroqAPI(apiKey, buildSummaryPrompt(truncated, title)),
-      callGroqAPI(apiKey, buildTagsPrompt(truncated)),
-      callGroqAPI(apiKey, buildSuggestionsPrompt(truncated, title)),
-      callGroqAPI(apiKey, buildCredibilityPrompt(truncated, title, url)),
-      callGroqAPI(apiKey, buildSentimentPrompt(truncated, title)),
-      callGroqAPI(apiKey, buildClickbaitPrompt(title, truncated))
-    ]);
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: 'DEHYPE_ANALYZE_REQUEST',
+        url: `${proxyUrl}/api/analyze`,
+        body: {
+          content: truncated,
+          title: title,
+          url: url,
+          type: 'page'
+        },
+        customKey: apiKey
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(res);
+        }
+      });
+    });
 
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Failed to get analysis from proxy.');
+    }
+
+    const result = response.data;
     hideLoading();
 
-    // Render each section
-    renderSummary(summaryResult);
-    renderTags(tagsResult);
-    renderSuggestions(suggestionsResult);
-    renderCredibility(credibilityResult);
-    renderSentiment(sentimentResult);
-    renderClickbait(clickbaitResult);
+    // Render each section using consolidated JSON output
+    renderSummary(result.summary);
+    renderTags(result.tags);
+    renderSuggestions(result.suggestions);
+    renderCredibility(result.credibility);
+    renderSentiment(result.sentiment);
+    renderClickbait(result.clickbait);
 
     // Save to history
     saveToHistory({
       title: title,
       url: url,
       timestamp: Date.now(),
-      credibility: extractScore(credibilityResult),
-      summary: summaryResult.substring(0, 100)
+      credibility: typeof result.credibility === 'object' ? result.credibility.score : extractScore(result.credibility),
+      summary: (result.summary || '').substring(0, 100)
     });
 
     // Update stats
@@ -207,137 +226,23 @@ async function runFullAnalysis(content, title, url) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  GROQ API INTEGRATION
-// ═══════════════════════════════════════════════════════════
-
-async function callGroqAPI(apiKey, prompt) {
-  const response = await new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({
-      type: 'DEHYPE_FETCH_URL',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: {
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 500
-      }
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      resolve(response);
-    });
-  });
-
-  if (!response.success) throw new Error(response.error);
-
-  let json = response.data;
-  if (typeof json === 'string') {
-    try { json = JSON.parse(json); } catch (e) { /* */ }
-  }
-
-  if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
-  if (!json.choices || json.choices.length === 0) throw new Error("No response from AI");
-
-  return json.choices[0].message?.content || "";
-}
-
-// ═══════════════════════════════════════════════════════════
-//  PROMPT ENGINEERING
-// ═══════════════════════════════════════════════════════════
-
-function buildSummaryPrompt(content, title) {
-  return `You are a content analysis AI. Provide a concise, factual summary (3-4 sentences max) of the following content.
-Title: "${title}"
-Content: "${content}"
-
-Rules:
-- Be objective and factual
-- Highlight the main points
-- Do NOT start with "This article" or "The content"
-- Write in plain English
-
-Summary:`;
-}
-
-function buildTagsPrompt(content) {
-  return `Analyze this content and generate exactly 6 relevant topic tags. Return ONLY the tags as a comma-separated list, nothing else.
-
-Content: "${content}"
-
-Tags:`;
-}
-
-function buildSuggestionsPrompt(content, title) {
-  return `Based on this content, provide 3 smart insights or suggestions. Each suggestion should be actionable and insightful.
-
-Title: "${title}"
-Content: "${content}"
-
-Return exactly 3 suggestions, each on a new line, starting with a dash (-).
-
-Suggestions:`;
-}
-
-function buildCredibilityPrompt(content, title, url) {
-  return `You are a media literacy expert. Analyze this content for credibility and trustworthiness.
-
-Title: "${title}"
-URL: "${url}"
-Content: "${content}"
-
-Respond in this EXACT format (3 lines only):
-SCORE: [number from 0-100]
-LABEL: [one of: Very Low | Low | Moderate | High | Very High]
-EXPLANATION: [1 sentence explaining the score, mentioning specific factors like sources cited, emotional language, factual claims, etc.]`;
-}
-
-function buildSentimentPrompt(content, title) {
-  return `Analyze the emotional tone and sentiment of this content.
-
-Title: "${title}"
-Content: "${content}"
-
-Respond in this EXACT format (2 lines only):
-SCORE: [number from 0-100 where 0=very negative, 50=neutral, 100=very positive]
-ANALYSIS: [1 sentence describing the emotional tone, any manipulation tactics, bias, or emotional triggers detected]`;
-}
-
-function buildClickbaitPrompt(title, content) {
-  return `Analyze this title for clickbait characteristics. Compare the title's claims/promises against the actual content.
-
-Title: "${title}"
-Content: "${content}"
-
-Respond in this EXACT format (2 lines only):
-SCORE: [number from 0-100 where 0=completely factual and 100=extreme clickbait]
-ANALYSIS: [1 sentence explaining why. Mention specific clickbait tactics if found: curiosity gaps, exaggeration, false urgency, emotional manipulation, misleading claims]`;
-}
-
-// ═══════════════════════════════════════════════════════════
 //  RENDERING FUNCTIONS
 // ═══════════════════════════════════════════════════════════
 
 function renderSummary(text) {
   const section = $('#summarySection');
   section.classList.remove('hidden');
-  $('#summaryText').textContent = text.replace(/^Summary:?\s*/i, '').trim();
+  $('#summaryText').textContent = (text || '').replace(/^Summary:?\s*/i, '').trim();
 }
 
-function renderTags(text) {
+function renderTags(tags) {
   const section = $('#tagsSection');
   section.classList.remove('hidden');
   const container = $('#tagsContainer');
   container.innerHTML = '';
 
-  const tags = text.replace(/^Tags:?\s*/i, '').split(',').map(t => t.trim()).filter(t => t);
-  tags.forEach(tag => {
+  const tagList = Array.isArray(tags) ? tags : (tags || '').replace(/^Tags:?\s*/i, '').split(',').map(t => t.trim()).filter(t => t);
+  tagList.forEach(tag => {
     const el = document.createElement('span');
     el.className = 'tag';
     el.textContent = tag;
@@ -345,35 +250,39 @@ function renderTags(text) {
   });
 }
 
-function renderSuggestions(text) {
+function renderSuggestions(suggestions) {
   const section = $('#suggestionsSection');
   section.classList.remove('hidden');
   const list = $('#suggestionsList');
   list.innerHTML = '';
 
-  const suggestions = text.split('\n')
+  const listItems = Array.isArray(suggestions) ? suggestions : (suggestions || '').split('\n')
     .map(s => s.replace(/^[-•*]\s*/, '').trim())
     .filter(s => s.length > 5);
 
-  suggestions.forEach(suggestion => {
+  listItems.forEach(suggestion => {
     const li = document.createElement('li');
     li.textContent = suggestion;
     list.appendChild(li);
   });
 }
 
-function renderCredibility(text) {
+function renderCredibility(credibility) {
   const section = $('#credibilitySection');
   section.classList.remove('hidden');
 
-  const lines = text.split('\n').filter(l => l.trim());
   let score = 50, label = 'Moderate', explanation = '';
-
-  lines.forEach(line => {
-    if (line.startsWith('SCORE:')) score = parseInt(line.replace('SCORE:', '').trim()) || 50;
-    if (line.startsWith('LABEL:')) label = line.replace('LABEL:', '').trim();
-    if (line.startsWith('EXPLANATION:')) explanation = line.replace('EXPLANATION:', '').trim();
-  });
+  if (typeof credibility === 'object' && credibility !== null) {
+    score = credibility.score ?? 50;
+    label = credibility.label ?? 'Moderate';
+    explanation = credibility.explanation ?? '';
+  } else if (typeof credibility === 'string') {
+    credibility.split('\n').forEach(line => {
+      if (line.startsWith('SCORE:')) score = parseInt(line.replace('SCORE:', '').trim()) || 50;
+      if (line.startsWith('LABEL:')) label = line.replace('LABEL:', '').trim();
+      if (line.startsWith('EXPLANATION:')) explanation = line.replace('EXPLANATION:', '').trim();
+    });
+  }
 
   score = Math.max(0, Math.min(100, score));
 
@@ -392,17 +301,20 @@ function renderCredibility(text) {
   $('#credibilityExplanation').textContent = explanation;
 }
 
-function renderSentiment(text) {
+function renderSentiment(sentiment) {
   const section = $('#sentimentSection');
   section.classList.remove('hidden');
 
-  const lines = text.split('\n').filter(l => l.trim());
   let score = 50, analysis = '';
-
-  lines.forEach(line => {
-    if (line.startsWith('SCORE:')) score = parseInt(line.replace('SCORE:', '').trim()) || 50;
-    if (line.startsWith('ANALYSIS:')) analysis = line.replace('ANALYSIS:', '').trim();
-  });
+  if (typeof sentiment === 'object' && sentiment !== null) {
+    score = sentiment.score ?? 50;
+    analysis = sentiment.analysis ?? '';
+  } else if (typeof sentiment === 'string') {
+    sentiment.split('\n').forEach(line => {
+      if (line.startsWith('SCORE:')) score = parseInt(line.replace('SCORE:', '').trim()) || 50;
+      if (line.startsWith('ANALYSIS:')) analysis = line.replace('ANALYSIS:', '').trim();
+    });
+  }
 
   score = Math.max(0, Math.min(100, score));
 
@@ -413,17 +325,20 @@ function renderSentiment(text) {
   $('#sentimentText').textContent = analysis;
 }
 
-function renderClickbait(text) {
+function renderClickbait(clickbait) {
   const section = $('#clickbaitSection');
   section.classList.remove('hidden');
 
-  const lines = text.split('\n').filter(l => l.trim());
   let score = 0, analysis = '';
-
-  lines.forEach(line => {
-    if (line.startsWith('SCORE:')) score = parseInt(line.replace('SCORE:', '').trim()) || 0;
-    if (line.startsWith('ANALYSIS:')) analysis = line.replace('ANALYSIS:', '').trim();
-  });
+  if (typeof clickbait === 'object' && clickbait !== null) {
+    score = clickbait.score ?? 0;
+    analysis = clickbait.analysis ?? '';
+  } else if (typeof clickbait === 'string') {
+    clickbait.split('\n').forEach(line => {
+      if (line.startsWith('SCORE:')) score = parseInt(line.replace('SCORE:', '').trim()) || 0;
+      if (line.startsWith('ANALYSIS:')) analysis = line.replace('ANALYSIS:', '').trim();
+    });
+  }
 
   score = Math.max(0, Math.min(100, score));
 

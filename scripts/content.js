@@ -1,3 +1,10 @@
+// ── HTML escaping (model output and error text are untrusted) ──
+function ytEsc(v) {
+    return String(v ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ═══════════════════════════════════════════════════════════
 //  DeHype Pro v2.0 — YouTube Content Script
 //  Enhanced with: auto-detection, bulk title processing,
@@ -427,11 +434,12 @@ async function runVideoAnalysis(transcript, statusEl, dotEl, resultsEl) {
             document.title = "✨ " + cleanSummary + " - YouTube";
         }
 
-        const clickbaitScore = result.clickbait?.score || 0;
+        const rawScore = Number(result.clickbait?.score);
+        const clickbaitScore = Number.isFinite(rawScore) ? Math.min(100, Math.max(0, Math.round(rawScore))) : 0;
         const clickbaitVerdict = result.clickbait?.verdict || '';
         const sentimentTone = result.sentiment?.tone || '';
         const sentimentAnalysis = result.sentiment?.analysis || '';
-        const tagList = result.tags || [];
+        const tagList = Array.isArray(result.tags) ? result.tags : [];
 
         // ── Update Stats ──
         chrome.storage.local.get('dehypeStats', (resStats) => {
@@ -447,7 +455,7 @@ async function runVideoAnalysis(transcript, statusEl, dotEl, resultsEl) {
         resultsEl.innerHTML = `
             <div class="dehype-section">
                 <div class="dehype-section-title">✨ De-Hyped Summary</div>
-                <div>${cleanSummary}</div>
+                <div>${ytEsc(cleanSummary)}</div>
             </div>
             <div class="dehype-section">
                 <div class="dehype-section-title">🎯 Clickbait Score</div>
@@ -458,15 +466,15 @@ async function runVideoAnalysis(transcript, statusEl, dotEl, resultsEl) {
                 <div class="dehype-score-bar">
                     <div class="dehype-score-fill" style="width:${clickbaitScore}%;background:linear-gradient(90deg,#10b981,#f59e0b,#ef4444)"></div>
                 </div>
-                <div style="color:#8888a0;font-size:11px;margin-top:4px">${clickbaitVerdict}</div>
+                <div style="color:#8888a0;font-size:11px;margin-top:4px">${ytEsc(clickbaitVerdict)}</div>
             </div>
             <div class="dehype-section">
-                <div class="dehype-section-title">💬 Emotional Tone: ${sentimentTone}</div>
-                <div style="color:#8888a0;font-size:11px">${sentimentAnalysis}</div>
+                <div class="dehype-section-title">💬 Emotional Tone: ${ytEsc(sentimentTone)}</div>
+                <div style="color:#8888a0;font-size:11px">${ytEsc(sentimentAnalysis)}</div>
             </div>
             <div class="dehype-section">
                 <div class="dehype-section-title">🏷️ Topics</div>
-                <div>${tagList.map(t => `<span class="dehype-tag">${t}</span>`).join('')}</div>
+                <div>${tagList.map(t => `<span class="dehype-tag">${ytEsc(t)}</span>`).join('')}</div>
             </div>
         `;
         resultsEl.style.display = 'block';
@@ -552,19 +560,19 @@ async function analyzeTextInline(text, statusEl, dotEl, resultsEl) {
                 <span class="dehype-close" onclick="document.getElementById('dehype-results').style.display='none'">&times;</span>
                 <div class="dehype-section">
                     <div class="dehype-section-title">SUMMARY</div>
-                    <div>${result.summary || ''}</div>
+                    <div>${ytEsc(result.summary)}</div>
                 </div>
                 <div class="dehype-section">
                     <div class="dehype-section-title">TOPIC</div>
-                    <div>${result.topic || ''}</div>
+                    <div>${ytEsc(result.topic)}</div>
                 </div>
                 <div class="dehype-section">
                     <div class="dehype-section-title">SENTIMENT</div>
-                    <div>${result.sentiment || ''}</div>
+                    <div>${ytEsc(result.sentiment)}</div>
                 </div>
                 <div class="dehype-section">
                     <div class="dehype-section-title">MANIPULATION</div>
-                    <div>${result.manipulation || ''}</div>
+                    <div>${ytEsc(result.manipulation)}</div>
                 </div>
             </div>
         `;

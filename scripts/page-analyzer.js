@@ -33,9 +33,6 @@ function initPageAnalyzer() {
         if (msg.type === 'DEHYPE_ANALYZE_TEXT' && msg.text) {
             analyzeSelectedText(msg.text);
         }
-        if (msg.type === 'DEHYPE_ANALYZE_LINK' && msg.url) {
-            showNotification(`🔗 Link analysis requested for: ${msg.url}`, 'info');
-        }
         if (msg.type === 'DEHYPE_AUTO_ANALYZE') {
             analyzeCurrentPage();
         }
@@ -124,6 +121,17 @@ function createFloatingButton() {
     });
 }
 
+// ── HTML escaping (model output and error text are untrusted) ──
+function apEsc(v) {
+    return String(v ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function apPct(v, fallback) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : fallback;
+}
+
 // ═══════════════════════════════════════════════════════════
 //  PAGE ANALYSIS
 // ═══════════════════════════════════════════════════════════
@@ -186,13 +194,13 @@ async function analyzeCurrentPage() {
         const suggestionList = Array.isArray(result.suggestions) ? result.suggestions : [];
 
         // Parse credibility
-        const credScore = result.credibility?.score || 0;
-        const credLabel = result.credibility?.label || '';
-        const credExplanation = result.credibility?.explanation || '';
+        const credScore = apPct(result.credibility?.score, 0);
+        const credLabel = apEsc(result.credibility?.label);
+        const credExplanation = apEsc(result.credibility?.explanation);
 
         // Parse sentiment
-        const sentScore = result.sentiment?.score || 50;
-        const sentAnalysis = result.sentiment?.analysis || '';
+        const sentScore = apPct(result.sentiment?.score, 50);
+        const sentAnalysis = apEsc(result.sentiment?.analysis);
 
         // Render
         const credScoreColor = credScore >= 70 ? '#10b981' : credScore >= 40 ? '#f59e0b' : '#ef4444';
@@ -201,7 +209,7 @@ async function analyzeCurrentPage() {
             contentArea.innerHTML = `
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">📝 Summary</div>
-                    <div class="dehype-ap-text">${result.summary || ''}</div>
+                    <div class="dehype-ap-text">${apEsc(result.summary)}</div>
                 </div>
                 ${storage.featureCredibility !== false ? `
                 <div class="dehype-ap-section">
@@ -226,11 +234,11 @@ async function analyzeCurrentPage() {
                 </div>` : ''}
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">🏷️ Topics</div>
-                    <div class="dehype-ap-tags">${tagList.map(t => `<span class="dehype-ap-tag">${t}</span>`).join('')}</div>
+                    <div class="dehype-ap-tags">${tagList.map(t => `<span class="dehype-ap-tag">${apEsc(t)}</span>`).join('')}</div>
                 </div>
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">💡 Insights</div>
-                    <ul class="dehype-ap-suggestions">${suggestionList.map(s => `<li>${s}</li>`).join('')}</ul>
+                    <ul class="dehype-ap-suggestions">${suggestionList.map(s => `<li>${apEsc(s)}</li>`).join('')}</ul>
                 </div>
             `;
         }
@@ -257,7 +265,7 @@ async function analyzeCurrentPage() {
 
     } catch (e) {
         if (contentArea) {
-            contentArea.innerHTML = `<div class="dehype-ap-error">❌ Analysis failed: ${e.message}</div>`;
+            contentArea.innerHTML = `<div class="dehype-ap-error">❌ Analysis failed: ${apEsc(e.message)}</div>`;
         }
     }
 }
@@ -315,34 +323,19 @@ async function analyzeSelectedText(text) {
                 <div class="dehype-ap-section">
                     <div class="dehype-ap-section-title">📝 Selected Text Analysis</div>
                     <div class="dehype-ap-text">
-                        <strong>Summary:</strong> ${result.summary || ''}<br><br>
-                        <strong>Topic:</strong> ${result.topic || ''}<br><br>
-                        <strong>Sentiment:</strong> ${result.sentiment || ''}<br><br>
-                        <strong>Manipulation:</strong> ${result.manipulation || ''}
+                        <strong>Summary:</strong> ${apEsc(result.summary)}<br><br>
+                        <strong>Topic:</strong> ${apEsc(result.topic)}<br><br>
+                        <strong>Sentiment:</strong> ${apEsc(result.sentiment)}<br><br>
+                        <strong>Manipulation:</strong> ${apEsc(result.manipulation)}
                     </div>
                 </div>
             `;
         }
     } catch (e) {
         if (contentArea) {
-            contentArea.innerHTML = `<div class="dehype-ap-error">❌ ${e.message}</div>`;
+            contentArea.innerHTML = `<div class="dehype-ap-error">❌ ${apEsc(e.message)}</div>`;
         }
     }
-}
-
-            }
-
-            let json = response.data;
-            if (typeof json === 'string') {
-                try { json = JSON.parse(json); } catch (e) { /* */ }
-            }
-
-            if (json.error) { reject(new Error(json.error.message || JSON.stringify(json.error))); return; }
-            if (!json.choices || json.choices.length === 0) { reject(new Error("No AI response")); return; }
-
-            resolve(json.choices[0].message?.content || "");
-        });
-    });
 }
 
 // ── Notification Helper ──

@@ -80,13 +80,13 @@
         <h3>API Connection Settings</h3>
         
         <label for="proxyUrl" style="display:block;margin-top:10px;font-size:12px;font-weight:600;color:#c084fc;">Backend Proxy URL</label>
-        <p class="hint">URL of your DeHype backend proxy. Default: <code>http://localhost:3000</code></p>
+        <p class="hint">URL of your DeHype backend proxy. Default: <code>http://localhost:3000</code>. Page text and video transcripts you analyze are sent to this proxy, which forwards them to Groq. The proxy does not store them.</p>
         <div class="input-group" style="margin-bottom:14px;">
           <input type="text" id="proxyUrl" placeholder="http://localhost:3000" autocomplete="off" style="width:100%;">
         </div>
 
         <label for="apiKey" style="display:block;font-size:12px;font-weight:600;color:#c084fc;">Custom Groq API Key (Optional)</label>
-        <p class="hint">Overrides the server key. Get free from <a href="https://console.groq.com/keys" target="_blank">Groq Console</a></p>
+        <p class="hint">Overrides the server key. It is saved in this browser and sent to the proxy with each request. Get free from <a href="https://console.groq.com/keys" target="_blank">Groq Console</a></p>
         <div class="input-group">
           <input type="password" id="apiKey" placeholder="gsk_..." autocomplete="off">
           <button class="btn-icon" id="toggleKeyVisibility" title="Show/Hide">

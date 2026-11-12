@@ -4,9 +4,31 @@
 //  page content extraction, and inter-script messaging
 // ═══════════════════════════════════════════════════════════
 
+// config.js is created locally from config.example.js and is not committed.
+const DEHYPE_PLACEHOLDER_SECRET = 'replace_with_a_long_random_string';
+let dehypeConfigProblem = null;
+try {
+    importScripts('config.js'); // defines DEHYPE_CONFIG
+    if (typeof DEHYPE_CONFIG === 'undefined' || !DEHYPE_CONFIG.SHARED_SECRET ||
+        DEHYPE_CONFIG.SHARED_SECRET === DEHYPE_PLACEHOLDER_SECRET) {
+        dehypeConfigProblem = 'scripts/config.js still has the placeholder SHARED_SECRET. Set it to the proxy\'s SHARED_SECRET and reload the extension.';
+    }
+} catch (e) {
+    dehypeConfigProblem = 'scripts/config.js is missing. Copy scripts/config.example.js to scripts/config.js, set SHARED_SECRET, and reload the extension.';
+}
+if (dehypeConfigProblem) {
+    console.error('DeHype config error: ' + dehypeConfigProblem);
+    chrome.action.setBadgeText({ text: '!' });
+    chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+    chrome.action.setTitle({ title: 'DeHype: not configured. ' + dehypeConfigProblem });
+}
+
 // ── Installation ──
 chrome.runtime.onInstalled.addListener(() => {
     console.log("DeHype Pro v2.0 Installed");
+
+    // Remove the menu item from earlier versions (it only showed a notification).
+    chrome.contextMenus.remove("dehype-analyze-link", () => void chrome.runtime.lastError);
 
     // Create context menu for right-click analysis
     chrome.contextMenus.create({
@@ -19,12 +41,6 @@ chrome.runtime.onInstalled.addListener(() => {
         id: "dehype-analyze-page",
         title: "📊 DeHype: Analyze This Page",
         contexts: ["page"]
-    });
-
-    chrome.contextMenus.create({
-        id: "dehype-analyze-link",
-        title: "🔗 DeHype: Check Link Credibility",
-        contexts: ["link"]
     });
 
     // Initialize default settings
@@ -69,24 +85,16 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             console.error("DeHype: Failed to send to content script", e);
         }
     }
-
-    if (info.menuItemId === "dehype-analyze-link" && info.linkUrl) {
-        try {
-            await chrome.tabs.sendMessage(tab.id, {
-                type: 'DEHYPE_ANALYZE_LINK',
-                url: info.linkUrl,
-                source: 'context-menu'
-            });
-        } catch (e) {
-            console.error("DeHype: Failed to send to content script", e);
-        }
-    }
 });
 
 // ── Universal Message Handler (CORS Proxy + Page Analysis) ──
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Proxy request router for backend DeHype server
     if (request.type === 'DEHYPE_ANALYZE_REQUEST') {
+        if (dehypeConfigProblem) {
+            sendResponse({ success: false, error: 'DeHype is not configured: ' + dehypeConfigProblem });
+            return false;
+        }
         const url = request.url;
         const method = 'POST';
         const body = request.body ? JSON.stringify(request.body) : null;
@@ -94,7 +102,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log(`DeHype BG Proxy: Requesting ${url} (type: ${request.body?.type})`);
 
         const headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-DeHype-Key": DEHYPE_CONFIG.SHARED_SECRET
         };
         
         if (request.customKey) {
